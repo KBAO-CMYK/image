@@ -3,21 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片上传存储展示</title>
+    <title>图片加载耗时展示</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>图片上传 & 加载耗时展示</h1>
-        <!-- 上传区域 -->
-        <div class="upload-area">
-            <input type="file" id="file-input" accept="image/*" multiple>
-            <button id="upload-btn">上传图片</button>
-            <p class="tip">支持多选，图片存储在浏览器本地（换设备/清缓存会丢失）</p>
-        </div>
-        <!-- 图片展示区域 -->
-        <div id="image-gallery" class="image-gallery">
-            <div class="empty-tip">暂无上传的图片</div>
+        <h1>图片加载耗时测试</h1>
+        <div id="image-list" class="image-list">
+            <!-- 图片卡片会通过JS动态生成 -->
         </div>
     </div>
     <script src="main.js"></script>
