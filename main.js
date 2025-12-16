@@ -1,90 +1,105 @@
-// 1. 仅保留图片文件名（无需手动标注大小）
-const imageList = [
-    { name: 'img1.jpg' },
-    { name: 'img2.jpg' },
-    { name: 'img3.jpg' },
-    { name: 'img4.jpg' },
-    { name: 'img5.jpg' },
-    { name: 'img6.jpg' },
-    { name: 'img7.jpg' },
-    { name: 'img8.jpg' },
-    { name: 'img9.jpg' },
-    { name: 'img10.jpg' }
-];
+// 1. 核心变量
+const fileInput = document.getElementById('file-input');
+const uploadBtn = document.getElementById('upload-btn');
+const imageGallery = document.getElementById('image-gallery');
+// 模拟“存储文件夹”：用LocalStorage存储图片（Base64格式）
+const STORAGE_KEY = 'uploaded_images';
 
-// 2. 工具函数：字节转换为 KB/MB（保留1位小数）
+// 2. 工具函数：字节转换为易读单位（KB/MB）
 function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
+    if (!bytes) return '未知大小';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
 }
 
-// 3. 工具函数：获取图片文件的实际大小（通过Content-Length响应头）
-async function getImageSize(imgName) {
-    const imgUrl = `./images/${imgName}`;
-    try {
-        const response = await fetch(imgUrl, { method: 'HEAD' }); // 只请求响应头，不下载图片
-        if (!response.ok) throw new Error('获取大小失败');
-        // 获取文件字节数（Content-Length）
-        const contentLength = response.headers.get('Content-Length');
-        if (!contentLength) return '未知大小';
-        // 转换为易读格式
-        return formatFileSize(Number(contentLength));
-    } catch (err) {
-        console.error(`获取${imgName}大小失败：`, err);
-        return '获取失败';
+// 3. 从LocalStorage读取所有图片（页面加载时执行）
+function loadAllStoredImages() {
+    const storedImages = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (storedImages.length === 0) {
+        imageGallery.innerHTML = '<div class="empty-tip">暂无上传的图片</div>';
+        return;
     }
+
+    // 清空画廊，重新渲染所有图片
+    imageGallery.innerHTML = '';
+    storedImages.forEach((imgData, index) => {
+        renderImageCard(imgData, index);
+    });
 }
 
-// 4. 获取图片列表容器
-const imageListContainer = document.getElementById('image-list');
+// 4. 渲染单张图片卡片（显示图片+尺寸+加载耗时）
+function renderImageCard(imgData, index) {
+    const card = document.createElement('div');
+    card.className = 'image-card';
+    card.innerHTML = `<div class="loading">加载中...</div>`;
+    imageGallery.appendChild(card);
 
-// 5. 遍历图片列表，自动获取大小 + 加载图片 + 计算耗时
-async function loadAllImages() {
-    for (const imgItem of imageList) {
-        // 创建图片卡片
-        const card = document.createElement('div');
-        card.className = 'image-card';
+    try {
+        // 记录从本地存储加载的开始时间
+        const startTime = performance.now();
+        const img = new Image();
+        img.src = imgData.base64; // 从LocalStorage读取Base64图片
 
-        // 先获取图片大小
-        const imgSize = await getImageSize(imgItem.name);
-        // 加载中提示（显示文件名+获取到的大小）
-        card.innerHTML = `<div class="loading">加载中...(${imgItem.name} - ${imgSize})</div>`;
-        imageListContainer.appendChild(card);
-
-        try {
-            // 记录加载开始时间
-            const startTime = performance.now();
-
-            // 创建图片对象
-            const img = new Image();
-            img.src = `./images/${imgItem.name}`; // 图片路径
-
-            // 等待图片加载完成
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-            });
-
-            // 计算加载耗时（毫秒，保留2位小数）
+        img.onload = () => {
+            // 计算加载耗时
             const loadTime = (performance.now() - startTime).toFixed(2);
-
-            // 更新卡片内容（显示图片+自动获取的大小+加载耗时）
+            // 更新卡片内容
             card.innerHTML = `
-                <img src="${img.src}" alt="测试图片 ${imgSize}">
-                <div class="info">
-                    <p>文件大小：<span>${imgSize}</span></p>
+                <img src="${imgData.base64}" alt="上传的图片 ${index+1}">
+                <div class="image-info">
+                    <p>图片名称：<span>${imgData.name}</span></p>
+                    <p>文件大小：<span>${formatFileSize(imgData.size)}</span></p>
                     <p>加载耗时：<span>${loadTime} 毫秒</span></p>
                 </div>
             `;
-        } catch (err) {
-            // 加载失败提示
-            card.innerHTML = `<div class="error">加载失败(${imgItem.name} - ${imgSize})：${err.message}</div>`;
-        }
+        };
+
+        img.onerror = () => {
+            card.innerHTML = `<div class="error">图片加载失败</div>`;
+        };
+    } catch (err) {
+        card.innerHTML = `<div class="error">加载异常：${err.message}</div>`;
     }
 }
 
-// 页面加载完成后执行
-window.onload = loadAllImages;
+// 5. 处理图片上传
+function handleUpload() {
+    const files = fileInput.files;
+    if (files.length === 0) {
+        alert('请选择要上传的图片！');
+        return;
+    }
+
+    // 读取已存储的图片
+    const storedImages = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+    // 遍历选中的文件，转Base64并存入LocalStorage
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            // 存储图片信息：名称、大小、Base64数据
+            storedImages.push({
+                name: file.name,
+                size: file.size, // 字节数
+                base64: e.target.result
+            });
+            // 保存到LocalStorage
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(storedImages));
+            // 重新渲染所有图片
+            loadAllStoredImages();
+        };
+        // 读取文件为Base64格式
+        reader.readAsDataURL(file);
+    });
+
+    // 清空文件选择框
+    fileInput.value = '';
+    alert(`成功选择 ${files.length} 张图片，已存储到本地！`);
+}
+
+// 6. 绑定事件
+uploadBtn.addEventListener('click', handleUpload);
+// 页面加载时读取并展示所有已存储的图片
+window.onload = loadAllStoredImages;
